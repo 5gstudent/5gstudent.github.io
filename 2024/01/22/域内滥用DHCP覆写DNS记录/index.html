@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <!-- so meta -->
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="HandheldFriendly" content="True">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
+    <meta name="description" content="本篇文章是从AKAMAI发布的两篇关于利用DHCP达到域内未授权复写DNS记录的文章中按自己的理解翻译而来 DNS和AD域每个AD域的DNS中有一个特殊的DNS区域叫ADIDNS（ Active Directory Integrated DNS）区域 ，这个区域用作域内主机域名记录和域内的不同服务记录。  ADI区域的记录使用“动态更新”的DNS特性来管理，这个特性允许客户端对自己的记录负责，当客">
+<meta property="og:type" content="article">
+<meta property="og:title" content="域内滥用DHCP覆写DNS记录">
+<meta property="og:url" content="http://5gstudent.github.io/2024/01/22/%E5%9F%9F%E5%86%85%E6%BB%A5%E7%94%A8DHCP%E8%A6%86%E5%86%99DNS%E8%AE%B0%E5%BD%95/index.html">
+<meta property="og:site_name" content="5gstudent&#39;s blog">
+<meta property="og:description" content="本篇文章是从AKAMAI发布的两篇关于利用DHCP达到域内未授权复写DNS记录的文章中按自己的理解翻译而来 DNS和AD域每个AD域的DNS中有一个特殊的DNS区域叫ADIDNS（ Active Directory Integrated DNS）区域 ，这个区域用作域内主机域名记录和域内的不同服务记录。  ADI区域的记录使用“动态更新”的DNS特性来管理，这个特性允许客户端对自己的记录负责，当客">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="https://raw.githubusercontent.com/5gstudent/imageHost/main/blog_image-20240115171025875.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/5gstudent/imageHost/main/blog_image-20240116134044290.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/5gstudent/imageHost/main/blog_image-20240117180312091.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/5gstudent/imageHost/main/blog_image-20240116134044290.png">
+<meta property="og:image" content="https://www.akamai.com/site/en/images/blog/2023/spoofing-dns-by-abusing-dhcp-fig-8.png">
+<meta property="og:image" content="https://www.akamai.com/site/en/images/blog/2023/spoofing-dns-by-abusing-dhcp-fig-9.png">
+<meta property="og:image" content="https://www.akamai.com/site/en/images/blog/2023/spoofing-dns-by-abusing-dhcp-fig-10.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/5gstudent/imageHost/main/blog_image-20240118161412489.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/5gstudent/imageHost/main/blog_image-20240118173336701.png">
+<meta property="og:image" content="https://www.akamai.com/site/en/images/blog/2023/spoofing-dns-by-abusing-dhcp-fig-13.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/5gstudent/imageHost/main/blog_image-20240119094937280.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/5gstudent/imageHost/main/blog_image-20240119100003205.png">
+<meta property="og:image" content="https://www.akamai.com/site/en/images/blog/2023/spoofing-dns-by-abusing-dhcp-fig-16.png">
+<meta property="og:image" content="https://www.akamai.com/site/en/images/blog/2023/spoofing-dns-by-abusing-dhcp-fig-17.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/5gstudent/imageHost/main/blog_image-20240119104851624.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/5gstudent/imageHost/main/blog_image-20240119111001739.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/5gstudent/imageHost/main/blog_image-20240119111251195.png">
+<meta property="article:published_time" content="2024-01-22T02:47:21.000Z">
+<meta property="article:modified_time" content="2024-01-22T02:58:16.852Z">
+<meta property="article:author" content="5gstudent">
+<meta property="article:tag" content="内网渗透">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://raw.githubusercontent.com/5gstudent/imageHost/main/blog_image-20240115171025875.png">
+    
+    
+      
+        
+          <link rel="shortcut icon" href="/images/favicon.ico">
+        
+      
+      
+        
+          <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
+        
+      
+      
+        
+          <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+        
+      
+    
+    <!-- title -->
+    <title>域内滥用DHCP覆写DNS记录</title>
+    <!-- async scripts -->
+    <!-- Google Analytics -->
+
+
+    <!-- Umami Analytics -->
+
+
+    <!-- styles -->
+    
+<link rel="stylesheet" href="/css/style.css">
+
+    <!-- persian styles -->
+    
+    <!-- rss -->
+    
+    
+	<!-- mathjax -->
+	
+<meta name="generator" content="Hexo 7.0.0"></head>
+
+<body class="max-width mx-auto px3 ltr">
+    
+      <div id="header-post">
+  <a id="menu-icon" href="#" aria-label="Menu"><i class="fa-solid fa-bars fa-lg"></i></a>
+  <a id="menu-icon-tablet" href="#" aria-label="Menu"><i class="fa-solid fa-bars fa-lg"></i></a>
+  <a id="top-icon-tablet" href="#" aria-label="Top" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');" style="display:none;"><i class="fa-solid fa-chevron-up fa-lg"></i></a>
+  <span id="menu">
+    <span id="nav">
+      <ul>
+        <!--
+       --><li><a href="/">Home</a></li><!--
+     --><!--
+       --><li><a href="/about/">About</a></li><!--
+     --><!--
+       --><li><a href="/archives/">Writing</a></li><!--
+     --><!--
+       --><li><a target="_blank" rel="noopener" href="http://github.com/5gstudent">Projects</a></li><!--
+     -->
+      </ul>
+    </span>
+    <br/>
+    <span id="actions">
+      <ul>
+        
+        
+        <li><a class="icon" aria-label="Next post" href="/2024/01/11/%E5%85%B3%E4%BA%8ENTLM-relay/"><i class="fa-solid fa-chevron-right" aria-hidden="true" onmouseover="$('#i-next').toggle();" onmouseout="$('#i-next').toggle();"></i></a></li>
+        
+        <li><a class="icon" aria-label="Back to top" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fa-solid fa-chevron-up" aria-hidden="true" onmouseover="$('#i-top').toggle();" onmouseout="$('#i-top').toggle();"></i></a></li>
+        <li><a class="icon" aria-label="Share post" href="#"><i class="fa-solid fa-share-alt" aria-hidden="true" onmouseover="$('#i-share').toggle();" onmouseout="$('#i-share').toggle();" onclick="$('#share').toggle();return false;"></i></a></li>
+      </ul>
+      <span id="i-prev" class="info" style="display:none;">Previous post</span>
+      <span id="i-next" class="info" style="display:none;">Next post</span>
+      <span id="i-top" class="info" style="display:none;">Back to top</span>
+      <span id="i-share" class="info" style="display:none;">Share post</span>
+    </span>
+    <br/>
+    <div id="share" style="display: none">
+      <ul>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.facebook.com/sharer.php?u=http://5gstudent.github.io/2024/01/22/%E5%9F%9F%E5%86%85%E6%BB%A5%E7%94%A8DHCP%E8%A6%86%E5%86%99DNS%E8%AE%B0%E5%BD%95/"><i class="fab fa-facebook " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://twitter.com/share?url=http://5gstudent.github.io/2024/01/22/%E5%9F%9F%E5%86%85%E6%BB%A5%E7%94%A8DHCP%E8%A6%86%E5%86%99DNS%E8%AE%B0%E5%BD%95/&text=域内滥用DHCP覆写DNS记录"><i class="fab fa-twitter " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.linkedin.com/shareArticle?url=http://5gstudent.github.io/2024/01/22/%E5%9F%9F%E5%86%85%E6%BB%A5%E7%94%A8DHCP%E8%A6%86%E5%86%99DNS%E8%AE%B0%E5%BD%95/&title=域内滥用DHCP覆写DNS记录"><i class="fab fa-linkedin " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://pinterest.com/pin/create/bookmarklet/?url=http://5gstudent.github.io/2024/01/22/%E5%9F%9F%E5%86%85%E6%BB%A5%E7%94%A8DHCP%E8%A6%86%E5%86%99DNS%E8%AE%B0%E5%BD%95/&is_video=false&description=域内滥用DHCP覆写DNS记录"><i class="fab fa-pinterest " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=域内滥用DHCP覆写DNS记录&body=Check out this article: http://5gstudent.github.io/2024/01/22/%E5%9F%9F%E5%86%85%E6%BB%A5%E7%94%A8DHCP%E8%A6%86%E5%86%99DNS%E8%AE%B0%E5%BD%95/"><i class="fa-solid fa-envelope " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://getpocket.com/save?url=http://5gstudent.github.io/2024/01/22/%E5%9F%9F%E5%86%85%E6%BB%A5%E7%94%A8DHCP%E8%A6%86%E5%86%99DNS%E8%AE%B0%E5%BD%95/&title=域内滥用DHCP覆写DNS记录"><i class="fab fa-get-pocket " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://reddit.com/submit?url=http://5gstudent.github.io/2024/01/22/%E5%9F%9F%E5%86%85%E6%BB%A5%E7%94%A8DHCP%E8%A6%86%E5%86%99DNS%E8%AE%B0%E5%BD%95/&title=域内滥用DHCP覆写DNS记录"><i class="fab fa-reddit " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.stumbleupon.com/submit?url=http://5gstudent.github.io/2024/01/22/%E5%9F%9F%E5%86%85%E6%BB%A5%E7%94%A8DHCP%E8%A6%86%E5%86%99DNS%E8%AE%B0%E5%BD%95/&title=域内滥用DHCP覆写DNS记录"><i class="fab fa-stumbleupon " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://digg.com/submit?url=http://5gstudent.github.io/2024/01/22/%E5%9F%9F%E5%86%85%E6%BB%A5%E7%94%A8DHCP%E8%A6%86%E5%86%99DNS%E8%AE%B0%E5%BD%95/&title=域内滥用DHCP覆写DNS记录"><i class="fab fa-digg " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.tumblr.com/share/link?url=http://5gstudent.github.io/2024/01/22/%E5%9F%9F%E5%86%85%E6%BB%A5%E7%94%A8DHCP%E8%A6%86%E5%86%99DNS%E8%AE%B0%E5%BD%95/&name=域内滥用DHCP覆写DNS记录&description="><i class="fab fa-tumblr " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://news.ycombinator.com/submitlink?u=http://5gstudent.github.io/2024/01/22/%E5%9F%9F%E5%86%85%E6%BB%A5%E7%94%A8DHCP%E8%A6%86%E5%86%99DNS%E8%AE%B0%E5%BD%95/&t=域内滥用DHCP覆写DNS记录"><i class="fab fa-hacker-news " aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+    
+    
+      <div id="toc">
+        <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#DNS%E5%92%8CAD%E5%9F%9F"><span class="toc-number">1.</span> <span class="toc-text">DNS和AD域</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#DHCP-DNS-%E5%8A%A8%E6%80%81%E6%9B%B4%E6%96%B0"><span class="toc-number">2.</span> <span class="toc-text">DHCP DNS 动态更新</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#DHCP-DNS-%E6%AC%BA%E9%AA%97"><span class="toc-number">3.</span> <span class="toc-text">DHCP DNS 欺骗</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%A6%86%E5%86%99%E5%B7%B2%E6%9C%89%E7%9A%84%E8%AE%B0%E5%BD%95"><span class="toc-number">4.</span> <span class="toc-text">覆写已有的记录</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#DNS%E8%AE%B0%E5%BD%95%E7%B1%BB%E5%9E%8B%E5%92%8C%E4%BB%96%E4%BB%AC%E7%9A%84%E6%8B%A5%E6%9C%89%E8%80%85"><span class="toc-number">4.1.</span> <span class="toc-text">DNS记录类型和他们的拥有者</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E8%AE%BF%E9%97%AE%E6%8E%A7%E5%88%B6%E5%88%97%E8%A1%A8%E9%99%90%E5%88%B6DHCP-DNS%E8%A6%86%E5%86%99"><span class="toc-number">4.2.</span> <span class="toc-text">访问控制列表限制DHCP DNS覆写</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%BB%A3%E5%88%9B%E5%BB%BA%E8%AE%B0%E5%BD%95%E8%A6%86%E5%86%99"><span class="toc-number">4.3.</span> <span class="toc-text">代创建记录覆写</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#DHCP-%E8%87%AA%E8%A6%86%E5%86%99"><span class="toc-number">4.4.</span> <span class="toc-text">DHCP 自覆写</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#DHCP-%E5%9F%9F%E6%8E%A7%E4%BB%BB%E6%84%8F%E8%A6%86%E5%86%99"><span class="toc-number">4.5.</span> <span class="toc-text">DHCP 域控任意覆写</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%BC%93%E8%A7%A3%E6%96%B9%E5%BC%8F%E5%92%8C%E7%BB%95%E8%BF%87"><span class="toc-number">5.</span> <span class="toc-text">缓解方式和绕过</span></a></li></ol>
+      </div>
+    
+  </span>
+</div>
+
+    
+    <div class="content index py4 ">
+        
+        <article class="post h-entry" itemscope itemtype="http://schema.org/BlogPosting">
+  <header>
+    
+    <h1 class="posttitle p-name" itemprop="name headline">
+        域内滥用DHCP覆写DNS记录
+    </h1>
+
+
+
+    <div class="meta">
+      <span class="author p-author h-card" itemprop="author" itemscope itemtype="http://schema.org/Person">
+        <span class="p-name" itemprop="name">5gstudent</span>
+      </span>
+      
+    <div class="postdate">
+      
+        <time datetime="2024-01-22T02:47:21.000Z" class="dt-published" itemprop="datePublished">2024-01-22</time>
+        
+      
+    </div>
+
+
+      
+    <div class="article-category">
+        <i class="fa-solid fa-archive"></i>
+        <a class="category-link" href="/categories/%E5%86%85%E7%BD%91%E6%B8%97%E9%80%8F/">内网渗透</a>
+    </div>
+
+
+      
+    <div class="article-tag">
+        <i class="fa-solid fa-tag"></i>
+        <a class="p-category" href="/tags/%E5%86%85%E7%BD%91%E6%B8%97%E9%80%8F/" rel="tag">内网渗透</a>
+    </div>
+
+
+    </div>
+  </header>
+  
+
+  <div class="content e-content" itemprop="articleBody">
+    <p>本篇文章是从AKAMAI发布的两篇关于利用DHCP达到域内未授权复写DNS记录的文章中按自己的理解翻译而来</p>
+<h2 id="DNS和AD域"><a href="#DNS和AD域" class="headerlink" title="DNS和AD域"></a>DNS和AD域</h2><p>每个AD域的DNS中有一个特殊的DNS区域叫ADIDNS（ Active Directory Integrated DNS）区域 ，这个区域用作域内主机域名记录和域内的不同服务记录。</p>
+<p><img src="https://raw.githubusercontent.com/5gstudent/imageHost/main/blog_image-20240115171025875.png" alt="The default ADIDNS"></p>
+<p>ADI区域的记录使用“动态更新”的DNS特性来管理，这个特性允许客户端对自己的记录负责，当客户端需要创建或修改DNS记录，会发送一个特殊的DNS请求。</p>
+<p>DNS动态更新的一个重要特性是安全跟新，用于控制谁能修改DNS记录。如果没有安全更新，DNS服务将允许任何人覆写DNS记录。</p>
+<img src="https://raw.githubusercontent.com/5gstudent/imageHost/main/blog_image-20240116134044290.png" alt="image-20240116134044290" style="zoom:80%;" />
+
+<p>当安全更新被使用，所有的更新请求需要认证和授权。在ADI区域通常使用Kerberos，当一个更新被发送到服务器，它会包含一个Kerberos票据用以认证用户。要了解更多关于通过DNS进行Kerberos认证，可以看<a target="_blank" rel="noopener" href="https://dirkjanm.io/relaying-kerberos-over-dns-with-krbrelayx-and-mitm6/">通过DNS中继Kerberos</a></p>
+<p>每个DNS记录都被一个ACL保护，这个ACL决定了每个principal的访问权限。当一个客户端创建了一个DNS记录，这个客户端就是这条记录的拥有者。通常，每个DNS客户端使用它自己的机器账户票据去操作DNS更新</p>
+<p>对于攻击者来说ADIDNS区域是很有趣的，一些<a target="_blank" rel="noopener" href="https://www.netspi.com/blog/technical/network-penetration-testing/exploiting-adidns/">先前的研究</a>可以参考一下。</p>
+<h2 id="DHCP-DNS-动态更新"><a href="#DHCP-DNS-动态更新" class="headerlink" title="DHCP DNS 动态更新"></a>DHCP DNS 动态更新</h2><p>DHCP是一个网络管理协议被用作自动分配IP地址和一些其他的网络选项。当一个客户端加入一个新的网络，这个客户端会尝试发送一个广播信息以获取DHCP服务器，DHCP服务器会返回一个分配的ip。</p>
+<p>虽然现在的window客户端（WIndows2000及以上）通常通过发送“DNS动态更新”来创建DNS记录，但并不总是这样。DNS记录也可以用叫做“DHCP DNS 动态更新”的DHCP特性来创建。<strong>这个特性是用作允许一个DHCP服务代表客户端注册DNS的</strong>。无论客户端是否被分配了IP，都可以联系DNS服务器并更新DNS记录。DHCP就是利用“DNS动态更新”来完成的。</p>
+<p>对两个名词做一下分辨：</p>
+<table>
+<thead>
+<tr>
+<th>名称</th>
+<th>协议</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>DNS Dynamic Updates</td>
+<td>DNS</td>
+<td>允许DNS客户端在DNS服务器上创建或修改DNS记录</td>
+</tr>
+<tr>
+<td>DHCP DNS Dynamic Updates</td>
+<td>DHCP</td>
+<td>允许DHCP服务端代表客户端创建或修改DNS记录</td>
+</tr>
+</tbody></table>
+<p>DNS Dynamic Updates过程</p>
+<img src="https://raw.githubusercontent.com/5gstudent/imageHost/main/blog_image-20240117180312091.png" alt="image-20240117180312091" style="zoom:80%;" />
+
+<ol>
+<li>DHCP客户端获取ip地址并告知FQDN</li>
+<li>DHCP服务端发送一个动态更新请求到DNS服务器</li>
+<li>DNS服务器确认请求，创建一个相关的记录并在动态更新的响应包中返回结果</li>
+</ol>
+<p>注意：即使DNS动态更新开启了，默认的配置需要客户端清楚地指定这个DNS记录是代表他们创建的</p>
+<img src="https://raw.githubusercontent.com/5gstudent/imageHost/main/blog_image-20240116134044290.png" alt="image-20240116134044290" style="zoom:80%;" />
+
+<p>客户端需要发送一个专用的DHCP选项，这个选项是DHCP数据包中的一个附加字段，并被用作在服务端和客户端之间交换信息。</p>
+<p><img src="https://www.akamai.com/site/en/images/blog/2023/spoofing-dns-by-abusing-dhcp-fig-8.png" alt="An example of DHCP options"></p>
+<p>客户端发送FQDN选项，该选项允许DHCP客户端告知服务端自己的FQDN并指定是否代表客户端注册一个DNS记录。为了达到上述目的，客户端可以使用FQDN选项中的Server标志，将它设置为1以告诉服务端创建一个给予的FQDN的记录。</p>
+<p><img src="https://www.akamai.com/site/en/images/blog/2023/spoofing-dns-by-abusing-dhcp-fig-9.png" alt="Server Flag"></p>
+<p>DHCP服务端接收到请求后会发送一个DNS动态更新并创建要求的DNS记录</p>
+<p><img src="https://www.akamai.com/site/en/images/blog/2023/spoofing-dns-by-abusing-dhcp-fig-10.png" alt="ADI DNS zone with our new record"></p>
+<p>这个特性是有用的但是现在已经不常用了（就像前面说的，大多数现代Windows客户端只创建自己的记录）。尽管如此，微软DHCP服务默认开启这个特性，这意味着DHCP服务会为任何发起请求的客户端注册一个DNS记录。</p>
+<p>值得注意的是DHCP DNS 动态更新不需要认证，网络中的任何人都可以从DHCP服务端中获取ip，因此攻击者基本上可以使用DHCP服务器来代表自己向DNS服务器认证。这使得攻击者可以不用任何凭据就能访问ADIDNS区域。</p>
+<h2 id="DHCP-DNS-欺骗"><a href="#DHCP-DNS-欺骗" class="headerlink" title="DHCP DNS 欺骗"></a>DHCP DNS 欺骗</h2><p>之前的<a target="_blank" rel="noopener" href="https://www.netspi.com/blog/technical/network-penetration-testing/exploiting-adidns/">ADIDNS欺骗</a>攻击利用ADIDNS作为武器，改进了经典的<a target="_blank" rel="noopener" href="https://attack.mitre.org/techniques/T1557/001/">LLMNR&#x2F;NBNS欺骗</a>攻击。在识别到失败的域名解析尝试后，攻击者会在ADI区域中注册域名，使其指向攻击者的机器。</p>
+<p>这种攻击的可能是有效的，但需要一个条件就是要有域凭证。通过使用DHCP服务可以绕过这个条件，达到未授权的效果。这个技术也在Hans Lakhan of TrustedSec的<a target="_blank" rel="noopener" href="https://www.trustedsec.com/blog/injecting-rogue-dns-records-using-dhcp/">博客</a>中就提出了。</p>
+<p>我们可以用什么样的DNS名称来攻击？借鉴再次 <a target="_blank" rel="noopener" href="https://www.netspi.com/blog/technical/network-penetration-testing/adidns-revisited/">Robertson的研究</a>，一些显而易见的方案肯定是不行的。</p>
+<ul>
+<li>臭名昭著的<a target="_blank" rel="noopener" href="https://trelis24.github.io/2018/08/03/Windows-WPAD-Poisoning-Responder/">WPAD</a>主机名会被<a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/powershell/module/dnsserver/get-dnsserverglobalqueryblocklist?view=windowsserver2022-ps">GQBL</a>全局查询禁止列表禁止查询。</li>
+<li>通配符*不能通过动态DNS更新创建，所以在这个场景下不能用</li>
+</ul>
+<p>没有这个两个能用的主机名，我们只能用网络中特定的“dead hosts”，我们可以通过LLMNR和NBT-NS来嗅探网络上的名称解析广播。在我们识别到一个潜在的“dead host”之后，我们可以通过DHCP DNS动态更新创建一个匹配的DNS记录。</p>
+<img src="https://raw.githubusercontent.com/5gstudent/imageHost/main/blog_image-20240118161412489.png" alt="image-20240118161412489" style="zoom:80%;" />
+
+<ol>
+<li>一台主机想要解析域名“PC.aka.test”， 给DNS服务器发送了域名查询请求。</li>
+<li>“PC.aka.test” 在DNS服务器中查询不到，所以返回了 “No such name”。</li>
+<li>主机发送LLMNR组播消息去获取“PC.aka.test”。</li>
+<li>攻击者尝试识别这个LLMNR信息并且 and requests an IP lease from the DHCP server with “PC.aka.test” as the FQDN.</li>
+<li>服务器发送一个DNS动态更新请求到DNS服务器，然后“PC.aka.test”就被创建了</li>
+</ol>
+<p>接下来当任何主机尝试解析PC.aka.test，都会被重定向到攻击者的ip，可以用ntlmrelayx.py来等待认证。</p>
+<p>这个方法比标准的LLMNR&#x2F;NBNS欺骗和ADIDNS欺骗变种更好</p>
+<ul>
+<li>经典的LLMNR&#x2F;NBNS欺骗不需要认证，但是攻击者和被攻击者需要在同一个局域网下</li>
+<li>ADIDNS欺骗允许目标主机不在一个局域网下，因为DNS能跨子网段工作，但需要认证后才行</li>
+</ul>
+<p>通过DHCP DNS动态更新可以取得前面两种方法的优点，不要在同一个LAN下面，也不需要认证。</p>
+<h2 id="覆写已有的记录"><a href="#覆写已有的记录" class="headerlink" title="覆写已有的记录"></a>覆写已有的记录</h2><p>当我们尝试创建一个已经存在的主机名会发生什么？</p>
+<p>我们发现了未授权覆写现有记录的情况，我们称之为“DHCP DNS 覆写”，在了解这些案例之前，我们先讨论更过关于DHCP动态更新过程中的细节。</p>
+<h3 id="DNS记录类型和他们的拥有者"><a href="#DNS记录类型和他们的拥有者" class="headerlink" title="DNS记录类型和他们的拥有者"></a>DNS记录类型和他们的拥有者</h3><p>在DHCP DNS的攻击过程中有两个重要的DNS记录需要做区分，我们将从现在开始将使用下面的名称：</p>
+<ul>
+<li>客户端记录：被WIdows客户端直接创建的记录</li>
+<li>代创建记录：DHCP服务端代表客户端创建的记录</li>
+</ul>
+<img src="https://raw.githubusercontent.com/5gstudent/imageHost/main/blog_image-20240118173336701.png" alt="image-20240118173336701" style="zoom:80%;" />
+
+<p>至关重要的区别是他们的拥有者。在早期的<a target="_blank" rel="noopener" href="https://www.akamai.com/blog/security-research/spoofing-dns-by-abusing-dhcp#dns">文章</a>中提到，当有一个DNS更新，一个客户端记录就会被创建，并且这个发送更新请求的角色会被当做记录的游泳者。对于普通Windows客户端来说，这个角色就是客户端的机器账号。</p>
+<p>人们可能认为代创建记录应该也被他们的请求客户端拥有，但事实并不是这样。DHCP服务器代表客户端发送DNS更新时用的是DHCP服务器自己的凭证，所以DHCP服务器是这个记录的拥有者。</p>
+<h3 id="访问控制列表限制DHCP-DNS覆写"><a href="#访问控制列表限制DHCP-DNS覆写" class="headerlink" title="访问控制列表限制DHCP DNS覆写"></a>访问控制列表限制DHCP DNS覆写</h3><p>当我们尝试对一个存在的记录（”PC.aka.test”）进行DHCP DNS动态更新时，失败了。观察到一个有趣的现象，DHCP服务端确实发送了包含FQDN的DNS更新，但是更新被服务端拒绝了。</p>
+<p><img src="https://www.akamai.com/site/en/images/blog/2023/spoofing-dns-by-abusing-dhcp-fig-13.png" alt="DNS UPDATE"></p>
+<p>因为DHCP服务器没有授权去修改记录</p>
+<p>PC.aka.test是一个“客户端记录”，是被PC$这个账户拥有的。当DHCP服务器发送了一个DNS更新，它使用自己机器账户DHCP$所以没有权限。</p>
+<img src="https://raw.githubusercontent.com/5gstudent/imageHost/main/blog_image-20240119094937280.png" alt="image-20240119094937280" style="zoom:80%;" />
+
+<p>总结：攻击者可以利用DHCP服务器发送任意的DNS更新，但DNS记录因其ACL而不会被覆盖。</p>
+<p>既然我们已经了解了防覆盖机制，我们来看下是如何覆盖的。</p>
+<h3 id="代创建记录覆写"><a href="#代创建记录覆写" class="headerlink" title="代创建记录覆写"></a>代创建记录覆写</h3><p>虽然由于严格的ACL策略无法覆写已有的客户端记录，但覆写代创建的记录是可以的。</p>
+<img src="https://raw.githubusercontent.com/5gstudent/imageHost/main/blog_image-20240119100003205.png" alt="image-20240119100003205" style="zoom:80%;" />
+
+<p>看一个例子，用一个Ubuntu服务器，这个服务器不在域内所以无法注册DNS记录，请求DHCP服务器代表自己来注册。</p>
+<p><img src="https://www.akamai.com/site/en/images/blog/2023/spoofing-dns-by-abusing-dhcp-fig-16.png" alt="It asks the DHCP server to do it on its behalf (Figure 16)."></p>
+<p>这条记录被DHCP服务器拥有，现在我们再从Uubuntu发送相同的FQDN请求。查看DNS记录发现覆写成功了，记录现在指向了刚被我们使用的IP。</p>
+<p><img src="https://www.akamai.com/site/en/images/blog/2023/spoofing-dns-by-abusing-dhcp-fig-17.png" alt="We check the DNS zone and see that our overwrite was successful, and the record now points to the IP that was just leased to us (Figure 17)."></p>
+<p>攻击已经完成了，但是影响有局限性，只影响了代注册的记录。我们之前提到，这些记录并没有客户端记录那么常用。尽管如此，当客户端不能注册自己的记录，代注册的记录可能会被使用，例如：</p>
+<ul>
+<li>非windows客户端</li>
+<li>古老的windows客户端</li>
+<li>禁止客户端DNS过呢更新的windows客户端</li>
+</ul>
+<h3 id="DHCP-自覆写"><a href="#DHCP-自覆写" class="headerlink" title="DHCP 自覆写"></a>DHCP 自覆写</h3><p>为了扩大漏洞影响，我们想要覆写再ADI区域中的任意客户端记录。问题是这些记录是被创建他们的机器拥有的，但我们只能用DHCP服务器的账户认证。</p>
+<p>当DHCP服务端创建它自己的DNS记录时，它的机器账户变成了这条记录的拥有者。原来我们可以让DHCP服务器对自己的DNS记录进行覆盖。</p>
+<img src="https://raw.githubusercontent.com/5gstudent/imageHost/main/blog_image-20240119104851624.png" alt="image-20240119104851624" style="zoom:80%;" />
+
+<p>攻击者可以拦截任何指向 DHCP 服务器的通信。严重程度取决于这些通信的性质。在大多数情况下，拦截指向 DHCP 服务器的通信的能力可被滥用，以拦截凭证并转发它们，或捕获可能安装在服务器上的其他服务的敏感通信。</p>
+<p>说到敏感服务，如果DHCP服务安装在域控上，我们能覆写域控的记录吗？答案是可以。</p>
+<h3 id="DHCP-域控任意覆写"><a href="#DHCP-域控任意覆写" class="headerlink" title="DHCP 域控任意覆写"></a>DHCP 域控任意覆写</h3><p>如果DHCP服务安装在域控上，当发送DNS更新时域控的机器账户会被使用。有趣的是，如果我们查看任意DNS记录的ACL，可以发现“ENTERPRISE DOMAIN CONTROLLERS”在每条记录都有写权限，不管是谁创建的。</p>
+<p><img src="https://raw.githubusercontent.com/5gstudent/imageHost/main/blog_image-20240119111001739.png" alt="image-20240119111001739"></p>
+<p>这是一个很大的问题，如果DHCP服务在域控上，它将会有域内所有记录的权限，攻击者可以利用它来ADI区域内的任意记录，并且是无需鉴权的。</p>
+<img src="https://raw.githubusercontent.com/5gstudent/imageHost/main/blog_image-20240119111251195.png" alt="image-20240119111251195" style="zoom:80%;" />
+
+<p>我们的数据中实现，这种有风险的配置很常见。在我们观察的网络中57%的DHCP服务是安装在域控上的。</p>
+<p>虽然微软在其文档中<a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/troubleshoot/windows-server/networking/configure-dns-dynamic-updates-windows-server-2003#:~:text=When%20the%20DHCP%20Server%20service,computers%2C%20and%20by%20domain%20controllers.">承认了这一风险</a>)，但我们认为，对这一错误配置的认识与其潜在影响并不相符。</p>
+<h2 id="缓解方式和绕过"><a href="#缓解方式和绕过" class="headerlink" title="缓解方式和绕过"></a>缓解方式和绕过</h2><p>这段先不翻了</p>
+
+  </div>
+</article>
+
+
+
+        
+          <div id="footer-post-container">
+  <div id="footer-post">
+
+    <div id="nav-footer" style="display: none">
+      <ul>
+        
+          <li><a href="/">Home</a></li>
+        
+          <li><a href="/about/">About</a></li>
+        
+          <li><a href="/archives/">Writing</a></li>
+        
+          <li><a target="_blank" rel="noopener" href="http://github.com/5gstudent">Projects</a></li>
+        
+      </ul>
+    </div>
+
+    
+    
+      <div id="toc-footer" style="display: none">
+        <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#DNS%E5%92%8CAD%E5%9F%9F"><span class="toc-number">1.</span> <span class="toc-text">DNS和AD域</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#DHCP-DNS-%E5%8A%A8%E6%80%81%E6%9B%B4%E6%96%B0"><span class="toc-number">2.</span> <span class="toc-text">DHCP DNS 动态更新</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#DHCP-DNS-%E6%AC%BA%E9%AA%97"><span class="toc-number">3.</span> <span class="toc-text">DHCP DNS 欺骗</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%A6%86%E5%86%99%E5%B7%B2%E6%9C%89%E7%9A%84%E8%AE%B0%E5%BD%95"><span class="toc-number">4.</span> <span class="toc-text">覆写已有的记录</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#DNS%E8%AE%B0%E5%BD%95%E7%B1%BB%E5%9E%8B%E5%92%8C%E4%BB%96%E4%BB%AC%E7%9A%84%E6%8B%A5%E6%9C%89%E8%80%85"><span class="toc-number">4.1.</span> <span class="toc-text">DNS记录类型和他们的拥有者</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E8%AE%BF%E9%97%AE%E6%8E%A7%E5%88%B6%E5%88%97%E8%A1%A8%E9%99%90%E5%88%B6DHCP-DNS%E8%A6%86%E5%86%99"><span class="toc-number">4.2.</span> <span class="toc-text">访问控制列表限制DHCP DNS覆写</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%BB%A3%E5%88%9B%E5%BB%BA%E8%AE%B0%E5%BD%95%E8%A6%86%E5%86%99"><span class="toc-number">4.3.</span> <span class="toc-text">代创建记录覆写</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#DHCP-%E8%87%AA%E8%A6%86%E5%86%99"><span class="toc-number">4.4.</span> <span class="toc-text">DHCP 自覆写</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#DHCP-%E5%9F%9F%E6%8E%A7%E4%BB%BB%E6%84%8F%E8%A6%86%E5%86%99"><span class="toc-number">4.5.</span> <span class="toc-text">DHCP 域控任意覆写</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%BC%93%E8%A7%A3%E6%96%B9%E5%BC%8F%E5%92%8C%E7%BB%95%E8%BF%87"><span class="toc-number">5.</span> <span class="toc-text">缓解方式和绕过</span></a></li></ol>
+      </div>
+    
+
+    <div id="share-footer" style="display: none">
+      <ul>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.facebook.com/sharer.php?u=http://5gstudent.github.io/2024/01/22/%E5%9F%9F%E5%86%85%E6%BB%A5%E7%94%A8DHCP%E8%A6%86%E5%86%99DNS%E8%AE%B0%E5%BD%95/"><i class="fab fa-facebook fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://twitter.com/share?url=http://5gstudent.github.io/2024/01/22/%E5%9F%9F%E5%86%85%E6%BB%A5%E7%94%A8DHCP%E8%A6%86%E5%86%99DNS%E8%AE%B0%E5%BD%95/&text=域内滥用DHCP覆写DNS记录"><i class="fab fa-twitter fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.linkedin.com/shareArticle?url=http://5gstudent.github.io/2024/01/22/%E5%9F%9F%E5%86%85%E6%BB%A5%E7%94%A8DHCP%E8%A6%86%E5%86%99DNS%E8%AE%B0%E5%BD%95/&title=域内滥用DHCP覆写DNS记录"><i class="fab fa-linkedin fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://pinterest.com/pin/create/bookmarklet/?url=http://5gstudent.github.io/2024/01/22/%E5%9F%9F%E5%86%85%E6%BB%A5%E7%94%A8DHCP%E8%A6%86%E5%86%99DNS%E8%AE%B0%E5%BD%95/&is_video=false&description=域内滥用DHCP覆写DNS记录"><i class="fab fa-pinterest fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=域内滥用DHCP覆写DNS记录&body=Check out this article: http://5gstudent.github.io/2024/01/22/%E5%9F%9F%E5%86%85%E6%BB%A5%E7%94%A8DHCP%E8%A6%86%E5%86%99DNS%E8%AE%B0%E5%BD%95/"><i class="fa-solid fa-envelope fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://getpocket.com/save?url=http://5gstudent.github.io/2024/01/22/%E5%9F%9F%E5%86%85%E6%BB%A5%E7%94%A8DHCP%E8%A6%86%E5%86%99DNS%E8%AE%B0%E5%BD%95/&title=域内滥用DHCP覆写DNS记录"><i class="fab fa-get-pocket fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://reddit.com/submit?url=http://5gstudent.github.io/2024/01/22/%E5%9F%9F%E5%86%85%E6%BB%A5%E7%94%A8DHCP%E8%A6%86%E5%86%99DNS%E8%AE%B0%E5%BD%95/&title=域内滥用DHCP覆写DNS记录"><i class="fab fa-reddit fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.stumbleupon.com/submit?url=http://5gstudent.github.io/2024/01/22/%E5%9F%9F%E5%86%85%E6%BB%A5%E7%94%A8DHCP%E8%A6%86%E5%86%99DNS%E8%AE%B0%E5%BD%95/&title=域内滥用DHCP覆写DNS记录"><i class="fab fa-stumbleupon fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://digg.com/submit?url=http://5gstudent.github.io/2024/01/22/%E5%9F%9F%E5%86%85%E6%BB%A5%E7%94%A8DHCP%E8%A6%86%E5%86%99DNS%E8%AE%B0%E5%BD%95/&title=域内滥用DHCP覆写DNS记录"><i class="fab fa-digg fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.tumblr.com/share/link?url=http://5gstudent.github.io/2024/01/22/%E5%9F%9F%E5%86%85%E6%BB%A5%E7%94%A8DHCP%E8%A6%86%E5%86%99DNS%E8%AE%B0%E5%BD%95/&name=域内滥用DHCP覆写DNS记录&description="><i class="fab fa-tumblr fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://news.ycombinator.com/submitlink?u=http://5gstudent.github.io/2024/01/22/%E5%9F%9F%E5%86%85%E6%BB%A5%E7%94%A8DHCP%E8%A6%86%E5%86%99DNS%E8%AE%B0%E5%BD%95/&t=域内滥用DHCP覆写DNS记录"><i class="fab fa-hacker-news fa-lg" aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+
+    <div id="actions-footer">
+        <a id="menu" class="icon" href="#" onclick="$('#nav-footer').toggle();return false;"><i class="fa-solid fa-bars fa-lg" aria-hidden="true"></i> Menu</a>
+        
+          <a id="toc" class="icon" href="#" onclick="$('#toc-footer').toggle();return false;"><i class="fa-solid fa-list fa-lg" aria-hidden="true"></i> TOC</a>
+        
+        <a id="share" class="icon" href="#" onclick="$('#share-footer').toggle();return false;"><i class="fa-solid fa-share-alt fa-lg" aria-hidden="true"></i> Share</a>
+        <a id="top" style="display:none" class="icon" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fa-solid fa-chevron-up fa-lg" aria-hidden="true"></i> Top</a>
+    </div>
+
+  </div>
+</div>
+
+        
+        <footer id="footer">
+  <div class="footer-left">
+    Copyright &copy;
+    
+    
+    2023-2024
+    5gstudent
+  </div>
+  <div class="footer-right">
+    <nav>
+      <ul>
+        <!--
+       --><li><a href="/">Home</a></li><!--
+     --><!--
+       --><li><a href="/about/">About</a></li><!--
+     --><!--
+       --><li><a href="/archives/">Writing</a></li><!--
+     --><!--
+       --><li><a target="_blank" rel="noopener" href="http://github.com/5gstudent">Projects</a></li><!--
+     -->
+      </ul>
+    </nav>
+  </div>
+</footer>
+
+    </div>
+    <!-- styles -->
+
+
+
+  <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" onload="this.onload=null;this.rel='stylesheet'"/>
+
+
+    <!-- jquery -->
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js" crossorigin="anonymous"></script>
+
+
+
+
+<!-- clipboard -->
+
+  
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.7/clipboard.min.js" crossorigin="anonymous"></script>
+  
+  <script type="text/javascript">
+  $(function() {
+    // copy-btn HTML
+    var btn = "<span class=\"btn-copy tooltipped tooltipped-sw\" aria-label=\"Copy to clipboard!\">";
+    btn += '<i class="fa-regular fa-clone"></i>';
+    btn += '</span>';
+    // mount it!
+    $(".highlight table").before(btn);
+    var clip = new ClipboardJS('.btn-copy', {
+      text: function(trigger) {
+        return Array.from(trigger.nextElementSibling.querySelectorAll('.code')).reduce((str,it)=>str+it.innerText+'\n','')
+      }
+    });
+    clip.on('success', function(e) {
+      e.trigger.setAttribute('aria-label', "Copied!");
+      e.clearSelection();
+    })
+  })
+  </script>
+
+
+<script src="/js/main.js"></script>
+
+<!-- search -->
+
+<!-- Baidu Analytics -->
+
+<!-- Cloudflare Analytics -->
+
+<!-- Disqus Comments -->
+
+<!-- utterances Comments -->
+
+</body>
+</html>
